@@ -27,7 +27,7 @@ struct sockaddr_in serverSocket;
 
 #define BUFFER_SIZE 4096
 
-void sendIndexCommand(int socketDescriptor, int index) {
+void sendIndexCommand(int index) {
 
     cout << "I send the index of the command\n";
     if (write(socketDescriptor, &index, sizeof(int)) == -1) {
@@ -36,7 +36,7 @@ void sendIndexCommand(int socketDescriptor, int index) {
     }
 }
 
-void sendExtension(int socketDescriptor, char extension[30]) {
+void sendExtension(char extension[30]) {
 
     if (write(socketDescriptor, extension, 30) < 0) {
         perror("Failed to send the extension");
@@ -47,7 +47,7 @@ void sendExtension(int socketDescriptor, char extension[30]) {
 
 }
 
-int receiveExtensionPossibility(int socketDescriptor) {
+int receiveExtensionPossibility() {
 
     int possibility = 0;
     if (read(socketDescriptor, &possibility, sizeof(int)) < 0) {
@@ -58,7 +58,7 @@ int receiveExtensionPossibility(int socketDescriptor) {
     return possibility;
 }
 
-void sendFile(int socketDescriptor, string fileName) {
+void sendFile(string fileName) {
 
     char buffer[BUFFER_SIZE];
     bzero(buffer, BUFFER_SIZE);
@@ -80,7 +80,7 @@ void sendFile(int socketDescriptor, string fileName) {
     fclose(file);
 }
 
-void receiveConvertedFile(int socketDescriptor, string fileName, string extension) {
+void receiveConvertedFile(string fileName, string extension) {
 
     char receiveBuffer[BUFFER_SIZE];
     bzero(receiveBuffer, BUFFER_SIZE);
@@ -89,7 +89,8 @@ void receiveConvertedFile(int socketDescriptor, string fileName, string extensio
     cout << "File converted name:" << convertedFileName.c_str() << "\n";
     FILE *file = fopen(convertedFileName.c_str(), "w");
     if (file == NULL) {
-        printf("File %s Cannot be opened file.\n", fileName.c_str());
+        // printf("File %s Cannot be opened file.\n", fileName.c_str());
+        cout << "File" << fileName.c_str() << " cannon be open\n";
     }
 
     int readBlockSize;
@@ -97,7 +98,7 @@ void receiveConvertedFile(int socketDescriptor, string fileName, string extensio
 
         int writeBlockSize = fwrite(receiveBuffer, sizeof(char), readBlockSize, file);
         if (writeBlockSize < readBlockSize) {
-            perror("File write failed on server.\n");
+            perror("File write failed.\n");
         }
         bzero(receiveBuffer, BUFFER_SIZE);
 
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
 
     if ((socketDescriptor = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("Error.Failed to create the socket");
-        exit(-1);
+        exit(1);
     }
 
     //Complete the structure used for the communication with the server
@@ -152,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     if (connect(socketDescriptor, (struct sockaddr *) &serverSocket, sizeof(struct sockaddr)) == -1) {
         perror("[Error]Failed to connect to server");
-        exit(-1);
+        exit(2);
     }
 
 
@@ -195,14 +196,14 @@ int main(int argc, char *argv[]) {
 
                 if (hasSameEnding(fileName, ending)) {
 
-                    sendIndexCommand(socketDescriptor, 1);
-                    sendExtension(socketDescriptor, currentExtension);
-                    sendExtension(socketDescriptor, futureExtension);
+                    sendIndexCommand(1);
+                    sendExtension(currentExtension);
+                    sendExtension(futureExtension);
 
-                    int isExtensionPossible = receiveExtensionPossibility(socketDescriptor);
+                    int isExtensionPossible = receiveExtensionPossibility();
                     if (isExtensionPossible == 1) {
-                        sendFile(socketDescriptor, fileName);
-                        receiveConvertedFile(socketDescriptor, extractFileName(fileName), futureExtension);
+                        sendFile(fileName);
+                        receiveConvertedFile(extractFileName(fileName), futureExtension);
 
                     } else {
                         cout << "Conversion isn't supported\n";
@@ -213,7 +214,7 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             case 2:
-                sendIndexCommand(socketDescriptor, 2);
+                sendIndexCommand(2);
                 close(socketDescriptor);
                 return 1;
             default:
