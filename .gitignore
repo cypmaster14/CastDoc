@@ -27,3 +27,10 @@
 *.exe
 *.out
 *.app
+
+
+.idea/*
+cmake-build*
+CMakeLists.txt
+*.pdf
+*.html
