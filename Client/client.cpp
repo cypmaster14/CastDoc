@@ -153,7 +153,8 @@ void signalHandler(int signum) {
 int main(int argc, char *argv[]) {
 
     if (argc != 3) {
-        cout << "Syntax error!! " << argv[0] << " " << IP << " " << PORT << endl;
+        cout << "Syntax error!! " << argv[0] << " <IP> <PORT> \n";
+        
         exit(1);
     }
 

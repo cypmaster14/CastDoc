@@ -306,9 +306,10 @@ int main(int argc, char *argv[]) {
 
     //We use threads to serve the clients in a concurrent way
     int client = 1;
+    int id=0;
     while (1) {
         cout << "Waiting at port:" << PORT << endl;
-        threadData *data;
+        
 
         socklen_t length = sizeof(clientSocket);
 
@@ -317,9 +318,10 @@ int main(int argc, char *argv[]) {
             exit(4);
         }
 
+        threadData *data;
         data = (struct threadData *) malloc(sizeof(struct threadData));
         data->clientSocketDescriptor = client;
-        data->threadID = client++;
+        data->threadID = id++;
         pthread_create(&threads[client], NULL, &treat, data);
     }
 }
