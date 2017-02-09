@@ -116,16 +116,17 @@ void receiveConvertedFile(string fileName, string extension) {
         cout << "File" << fileName.c_str() << " cannon be open\n";
     }
 
-    int readBlockSize;
+    int readBlockSize = 0;
+    int writeBlockSize = 0;
     while ((readBlockSize = read(socketDescriptor, receiveBuffer, BUFFER_SIZE)) > 0) {
 
-        int writeBlockSize = fwrite(receiveBuffer, sizeof(char), readBlockSize, file);
+        writeBlockSize = fwrite(receiveBuffer, sizeof(char), readBlockSize, file);
         if (writeBlockSize < readBlockSize) {
             perror("File write failed.\n");
         }
         bzero(receiveBuffer, BUFFER_SIZE);
 
-        if (readBlockSize == 0 || readBlockSize != BUFFER_SIZE) {
+        if (readBlockSize != BUFFER_SIZE) {
             break;
         }
     }
@@ -153,7 +154,8 @@ void signalHandler(int signum) {
 int main(int argc, char *argv[]) {
 
     if (argc != 3) {
-        cout << "Syntax error!! " << argv[0] << " " << IP << " " << PORT << endl;
+        cout << "Syntax error!! " << argv[0] << " <IP> <PORT> \n";
+
         exit(1);
     }
 

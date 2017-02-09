@@ -159,13 +159,14 @@ void receiveData(int clientSocketDescriptor, string filename) {
 
     FILE *file = fopen(filename.c_str(), "w");
     int readBlockSize = 0;
+    int writeBlockSize = 0;
     cout << "Waiting to receive the file\n";
     while ((readBlockSize = read(clientSocketDescriptor, &receiveBuffer, BUFFER_SIZE)) > 0) {
 
 //        cout << "Size received:" << readBlockSize << endl;
         //Write the bytes receive into the file
-        int writeBlockSize = fwrite(receiveBuffer, sizeof(char), readBlockSize, file);
-        if (readBlockSize == 0 || readBlockSize != BUFFER_SIZE) {
+        writeBlockSize = fwrite(receiveBuffer, sizeof(char), readBlockSize, file);
+        if (readBlockSize != BUFFER_SIZE) {
             break;
         }
         if (writeBlockSize < readBlockSize) {
@@ -176,7 +177,7 @@ void receiveData(int clientSocketDescriptor, string filename) {
     }
 
     if (readBlockSize < 0) {
-        cout << "Failed to read from socket due to an error " << errno << endl;
+        perror("Failed to read the file from socket due to an error");
         pthread_exit(NULL);
     }
 
@@ -258,8 +259,7 @@ void sendConvertedFile(int clientSocketDescriptor, string fileName) {
     int bytesRead = 0;
     while ((bytesRead = fread(buffer, sizeof(char), BUFFER_SIZE, file)) > 0) {
         if (send(clientSocketDescriptor, buffer, bytesRead, MSG_NOSIGNAL) < 0) {
-
-            cout << "[ERROR] Faled to send the file:" << fileName.c_str() << "due to an error" << errno << endl;
+            cout << "[ERROR] Failed to send the file:" << fileName.c_str() << "due to an error" << errno << endl;
             fclose(file);
             removeFile(fileName);
             pthread_exit(NULL);
@@ -306,9 +306,10 @@ int main(int argc, char *argv[]) {
 
     //We use threads to serve the clients in a concurrent way
     int client = 1;
+    int id = 0;
     while (1) {
         cout << "Waiting at port:" << PORT << endl;
-        threadData *data;
+
 
         socklen_t length = sizeof(clientSocket);
 
@@ -317,9 +318,10 @@ int main(int argc, char *argv[]) {
             exit(4);
         }
 
+        threadData *data;
         data = (struct threadData *) malloc(sizeof(struct threadData));
         data->clientSocketDescriptor = client;
-        data->threadID = client++;
+        data->threadID = id++;
         pthread_create(&threads[client], NULL, &treat, data);
     }
 }
