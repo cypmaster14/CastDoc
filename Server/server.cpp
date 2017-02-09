@@ -33,7 +33,10 @@ struct sockaddr_in serverSocket;
 struct sockaddr_in clientSocket;
 int serverSocketDescriptor;
 
-
+/*!
+ * Structure that is send to the thread<br>
+ * Contains information about the client
+ */
 struct threadData {
     int threadID;
     int clientSocketDescriptor;
@@ -41,6 +44,9 @@ struct threadData {
 
 ifstream configFile("config.cfg");
 
+/*!
+ * Structure that contains regarding the conversion that the server can realise
+ */
 struct configConvert {
     string currentExtension;
     string futureExtension;
@@ -49,9 +55,16 @@ struct configConvert {
 
 list <configConvert> possibleConversion;
 
-
+/*!
+ * The function that will execute for each client that is connected
+ * @param argv Arguments of the thread. Information about the client, Socket and ID.
+ * @return
+ */
 static void *treat(void *argv);
 
+/*!
+ * Function that reads the config file and loads into memory the conversions that server can realise
+ */
 void uploadConversion() {
 
     regex_t preg[1];
@@ -74,90 +87,109 @@ void uploadConversion() {
     configFile.close();
 }
 
+/*!
+ * Function that reads an extension from the client
+ * @param clientSocketDescriptor Socket used to communicate with the client
+ * @return A string that represent the extension that was read
+ */
 string getExtension(int clientSocketDescriptor) {
 
-    char extension[30];
-    if (read(clientSocketDescriptor, extension, 30) < 0) {
+    char extension[10];
+    if (read(clientSocketDescriptor, extension, 10) < 0) {
         perror("Failed to read the  extension");
         pthread_exit(NULL);
     }
 
-    cout << "Extension read:" << extension << "\n";
+    cout << "Extension read:" << extension << endl;
     string aux(extension);
     return aux;
 
 }
 
-int checkConversion(string currentExtension, string futureExtension) {
+
+/*!
+ * Function that checks if the conversion can be done by the server.
+ * @param currentExtension The current extension of the file.
+ * @param futureExtension The future extension of the file.
+ * @return
+ */
+bool verifyExtensions(string currentExtension, string futureExtension) {
 
     for (list<configConvert>::iterator begin = possibleConversion.begin(), end = possibleConversion.end();
          begin != end; begin++) {
         if (currentExtension.compare(begin->currentExtension) == 0 &&
             futureExtension.compare(begin->futureExtension) == 0) {
-            return 1;
+            cout << "Conversion is possible\n";
+            return true;
         }
     }
+
+    cout << "Conversion isn't possible\n";
     return 0;
 }
 
-bool verifyExtensions(int clientSocketDescriptor, string firstExtension, string secondExtension) {
+/*!
+ * Function that sends to the client the possibility of the conversion that he wants to do.
+ * @param clientSocketDescriptor The socket that is used for the communication with the client
+ * @param isConversionPossible  The possibility of the conversion
+ */
+void sendPossibilityOfConversion(int clientSocketDescriptor, int isConversionPossible) {
 
-    int isConversionPossible = checkConversion(firstExtension, secondExtension);
-    if (isConversionPossible == 1) {
-        cout << "Conversion is possible\n";
-    } else {
-        cout << "Conversion isn't possible\n";
-    }
-
-    //We send the client if the conversion is possible or not
     if (send(clientSocketDescriptor, &isConversionPossible, sizeof(int), MSG_NOSIGNAL) == -1) {
         if (errno == EPIPE) {
             perror("Failed to send the result of possible conversion");
             close(clientSocketDescriptor);
             pthread_exit(NULL);
-//            exit(10);
         }
     }
-
     cout << "Am trimis clientului posibilitatea de conversie\n";
-    return isConversionPossible == 1;
 }
 
 
+/*!
+ * Function that receives the file that will be converted<br>
+ * The file is split into pieces of 4096 bytes
+ * @param clientSocketDescriptor The socket that is used for the communication with the client
+ * @param filename The name that the file that was received from the client will have
+ */
 void receiveData(int clientSocketDescriptor, string filename) {
 
     char receiveBuffer[BUFFER_SIZE];
-    bzero(receiveBuffer, BUFFER_SIZE);
+    bzero(receiveBuffer, BUFFER_SIZE); //Fill the buffer zero values
 
-    FILE *file = fopen(filename.c_str(), "a");
+    FILE *file = fopen(filename.c_str(), "w");
     int readBlockSize = 0;
     cout << "Waiting to receive the file\n";
     while ((readBlockSize = read(clientSocketDescriptor, &receiveBuffer, BUFFER_SIZE)) > 0) {
 
-//        cout << "Size received:" << readBlockSize << "\n";
-
+//        cout << "Size received:" << readBlockSize << endl;
+        //Write the bytes receive into the file
         int writeBlockSize = fwrite(receiveBuffer, sizeof(char), readBlockSize, file);
         if (readBlockSize == 0 || readBlockSize != BUFFER_SIZE) {
             break;
         }
         if (writeBlockSize < readBlockSize) {
             perror("[ERROR]File write failed on server\n");
-//            exit(11);
             pthread_exit(NULL);
         }
         bzero(receiveBuffer, BUFFER_SIZE);
     }
 
     if (readBlockSize < 0) {
-        cout << "Failed to read from socket due to an error " << errno << "\n";
-//        exit(12);
+        cout << "Failed to read from socket due to an error " << errno << endl;
         pthread_exit(NULL);
     }
 
-    cout << "File:" << filename << " was received from client";
+    cout << "File:" << filename << " was received from client\n";
     fclose(file);
 }
 
+/*!
+ * Function that returns the module that will be used to convert the file
+ * @param currentExtension The current extension of the file
+ * @param futureExtension The future extension of the file
+ * @return The module that will be used to convert the file
+ */
 string getConvertCommand(string currentExtension, string futureExtension) {
 
     for (list<configConvert>::iterator begin = possibleConversion.begin(), end = possibleConversion.end();
@@ -169,6 +201,14 @@ string getConvertCommand(string currentExtension, string futureExtension) {
     }
 }
 
+
+/*!
+ * Function that converts the file
+ * @param fileName The name of the file that is being converted
+ * @param newFileName The name of the converted file that will be send to client
+ * @param currentExtension The current extension of the file
+ * @param secondExtension The future extension of the file
+ */
 void convertFile(string fileName, string newFileName, string currentExtension, string secondExtension) {
 
     string conversionCommand = getConvertCommand(currentExtension, secondExtension);
@@ -178,41 +218,53 @@ void convertFile(string fileName, string newFileName, string currentExtension, s
         conversionCommand.append(" ").append(fileName.c_str());
     }
 
-    cout << "Conversion command:" << conversionCommand.c_str() << "\n";
-    cout << "New file name:" << newFileName.c_str() << "\n";
-
+    cout << "Conversion command:" << conversionCommand.c_str() << endl;
+    cout << "New file name:" << newFileName.c_str() << endl;
+    cout << "File is being converted\n";
     system(conversionCommand.c_str());//run bash command that makes the conversion on file
+    cout << "File was converted\n";
 
 }
 
+/*!
+ * Function that removes a file
+ * @param fileName The path of the file that will be removed
+ */
 void removeFile(string fileName) {
     if (remove(fileName.c_str()) == -1) {
         perror("[ERROR]Failed to remove a file");
     }
 }
 
+
+/*!
+ * Function that send to the client the converted file.
+ * The file is split into pieces of 4096 bytes
+ * @param clientSocketDescriptor The socket that is used for the communication with the client
+ * @param fileName The path of the file that will be send to client
+ */
 void sendConvertedFile(int clientSocketDescriptor, string fileName) {
 
     char buffer[BUFFER_SIZE];
     bzero(buffer, BUFFER_SIZE);
 
-    cout << "Sending the file converted:" << fileName.c_str() << "\n";
+    cout << "Sending the file converted:" << fileName.c_str() << endl;
     FILE *file = fopen(fileName.c_str(), "r");
     if (file == NULL) {
         printf("ERROR: File %s not found.\n", fileName.c_str());
-        exit(1);
+        pthread_exit(NULL);
     }
 
     int bytesRead = 0;
     while ((bytesRead = fread(buffer, sizeof(char), BUFFER_SIZE, file)) > 0) {
         if (send(clientSocketDescriptor, buffer, bytesRead, MSG_NOSIGNAL) < 0) {
 
-            cout << "[ERROR] Faled to send the file:" << fileName.c_str() << "due to an error" << errno << "\n";
+            cout << "[ERROR] Faled to send the file:" << fileName.c_str() << "due to an error" << errno << endl;
             fclose(file);
             removeFile(fileName);
             pthread_exit(NULL);
         }
-//        cout << "FileS ize Send:" << sizeFileSend << "\n";
+//        cout << "FileS ize Send:" << sizeFileSend << endl;
         bzero(buffer, BUFFER_SIZE);
     }
 
@@ -255,7 +307,7 @@ int main(int argc, char *argv[]) {
     //We use threads to serve the clients in a concurrent way
     int client = 1;
     while (1) {
-        cout << "Waiting at port:" << PORT << "\n";
+        cout << "Waiting at port:" << PORT << endl;
         threadData *data;
 
         socklen_t length = sizeof(clientSocket);
@@ -272,6 +324,11 @@ int main(int argc, char *argv[]) {
     }
 }
 
+/*!
+ * The function that will execute for each client that is connected
+ * @param argv Arguments of the thread. Information about the client, Socket and ID.
+ * @return
+ */
 static void *treat(void *argv) {
 
     struct threadData data;
@@ -281,6 +338,7 @@ static void *treat(void *argv) {
     string firstExtension, secondExtension;
     int indexOfCommand;
     bool EXIT_FLAG = false;
+    bool isConversionPossible;
 
     while (!EXIT_FLAG) {
 
@@ -296,9 +354,11 @@ static void *treat(void *argv) {
 
                 firstExtension = getExtension(data.clientSocketDescriptor);
                 secondExtension = getExtension(data.clientSocketDescriptor);
-                cout << firstExtension.c_str() << " " << secondExtension.c_str() << " " << "\n";
+                cout << firstExtension.c_str() << " " << secondExtension.c_str() << " " << endl;
 
-                if (verifyExtensions(data.clientSocketDescriptor, firstExtension, secondExtension)) {
+                isConversionPossible = verifyExtensions(firstExtension, secondExtension);
+                if (isConversionPossible) {
+                    sendPossibilityOfConversion(data.clientSocketDescriptor, 1);
 
                     string filename = "Client";
                     filename += to_string(data.threadID).append(".").append(firstExtension.c_str());
@@ -310,8 +370,8 @@ static void *treat(void *argv) {
                     removeFile(filename);
                     sendConvertedFile(data.clientSocketDescriptor, newFileName);
                     removeFile(newFileName);
-
                 } else {
+                    sendPossibilityOfConversion(data.clientSocketDescriptor, 0);
                     cout << "Conversion isn't possible\n";
                 }
                 break;

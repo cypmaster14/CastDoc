@@ -27,8 +27,11 @@ struct sockaddr_in serverSocket;
 
 #define BUFFER_SIZE 4096
 
+/*!
+ * Function that sends to server the index of the command entered by the client
+ * @param index Index of the command (<strong>1-></strong>Convert ; <strong>2-></strong>Exit)
+ */
 void sendIndexCommand(int index) {
-
     cout << "I send the index of the command\n";
     if (write(socketDescriptor, &index, sizeof(int)) == -1) {
         perror("[Error] Failed to send the index of the command");
@@ -36,28 +39,43 @@ void sendIndexCommand(int index) {
     }
 }
 
-void sendExtension(char extension[30]) {
 
-    if (write(socketDescriptor, extension, 30) < 0) {
+/*!
+ * Function that sends to server the extension
+ * @param extension String that represents an extension entered by the client
+ */
+void sendExtension(char extension[10]) {
+
+    if (write(socketDescriptor, extension, 10) < 0) {
         perror("Failed to send the extension");
         exit(22);
     }
 
-    cout << "I sent extension:" << extension << "\n";
+    cout << "I sent extension:" << extension << endl;
 
 }
 
-int receiveExtensionPossibility() {
+/*!
+ * Function that reads from server if the conversion that the clients want to realise
+ * it is possible
+ * @return <strong>True</strong> if the server can realise the conversion, <strong>False</strong> otherwise
+ */
+bool receiveExtensionPossibility() {
 
     int possibility = 0;
     if (read(socketDescriptor, &possibility, sizeof(int)) < 0) {
         perror("Failed to receive the availability of conversion");
         return 0;
     }
-    cout << "Possibility:" << possibility << "\n";
-    return possibility;
+    cout << "Possibility:" << possibility << endl;
+    return possibility == 1;
 }
 
+/*!
+ *  Function that sends the file the client wants to convert to server.<br>
+ *  The file is split into pieces of 4096 bytes.
+ * @param fileName The path to the file that will be send
+ */
 void sendFile(string fileName) {
 
     char buffer[BUFFER_SIZE];
@@ -80,16 +98,21 @@ void sendFile(string fileName) {
     fclose(file);
 }
 
+/*!
+ * Function that receives the converted file from server.
+ * Clients receives pieces of 4096 bytes and reassemble it
+ * @param fileName The path to the file that was converted , without the extension
+ * @param extension The new extension of the file
+ */
 void receiveConvertedFile(string fileName, string extension) {
 
     char receiveBuffer[BUFFER_SIZE];
     bzero(receiveBuffer, BUFFER_SIZE);
 
     string convertedFileName = getValidNameForConvertedFile(fileName, extension);
-    cout << "File converted name:" << convertedFileName.c_str() << "\n";
+    cout << "File converted name:" << convertedFileName.c_str() << endl;
     FILE *file = fopen(convertedFileName.c_str(), "w");
     if (file == NULL) {
-        // printf("File %s Cannot be opened file.\n", fileName.c_str());
         cout << "File" << fileName.c_str() << " cannon be open\n";
     }
 
@@ -108,7 +131,7 @@ void receiveConvertedFile(string fileName, string extension) {
     }
 
     if (readBlockSize < 0) {
-        cout << "Failed to read the file due to an error" << " " << errno << "\n";
+        cout << "Failed to read the file due to an error" << " " << errno << endl;
         exit(25);
     }
     cout << "File was converted successfully\n";
@@ -116,6 +139,10 @@ void receiveConvertedFile(string fileName, string extension) {
 
 }
 
+/*!
+ * Function that handles the signals
+ * @param signum The signal to be handled
+ */
 void signalHandler(int signum) {
 
     cout << "\nInterrupt signal (" << signum << ") received.\n";
@@ -126,7 +153,7 @@ void signalHandler(int signum) {
 int main(int argc, char *argv[]) {
 
     if (argc != 3) {
-        printf("Syntax error!! %s <IP> <PORT>\n", argv[0]);
+        cout << "Syntax error!! " << argv[0] << " " << IP << " " << PORT << endl;
         exit(1);
     }
 
@@ -157,8 +184,8 @@ int main(int argc, char *argv[]) {
     }
 
 
-    char currentExtension[30];
-    char futureExtension[30];
+    char currentExtension[10];
+    char futureExtension[10];
     string fileName;
     int menuIndex;
     string commandEntered;
@@ -201,7 +228,7 @@ int main(int argc, char *argv[]) {
                     sendExtension(futureExtension);
 
                     int isExtensionPossible = receiveExtensionPossibility();
-                    if (isExtensionPossible == 1) {
+                    if (isExtensionPossible) {
                         sendFile(fileName);
                         receiveConvertedFile(extractFileName(fileName), futureExtension);
 
