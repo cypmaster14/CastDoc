@@ -156,7 +156,6 @@ int main(int argc, char *argv[]) {
 
     if (argc != 3) {
         cout << "Syntax error!! " << argv[0] << " <IP> <PORT> \n";
-
         exit(1);
     }
 
@@ -252,6 +251,5 @@ int main(int argc, char *argv[]) {
 
         }
     }
-
 }
 
