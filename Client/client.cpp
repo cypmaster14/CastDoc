@@ -124,11 +124,12 @@ void receiveConvertedFile(string fileName, string extension) {
         if (writeBlockSize < readBlockSize) {
             perror("File write failed.\n");
         }
-        bzero(receiveBuffer, BUFFER_SIZE);
 
         if (readBlockSize != BUFFER_SIZE) {
             break;
         }
+
+        bzero(receiveBuffer, BUFFER_SIZE);
     }
 
     if (readBlockSize < 0) {
